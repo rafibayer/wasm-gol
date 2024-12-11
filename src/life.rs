@@ -33,14 +33,19 @@ impl World {
         let width = 100;
         let height = 100;
 
+        let mut init: Vec<char> = include_str!("init.txt")
+            .chars()
+            .take(width * height)
+            .collect();
+        let need = init.len() - (width * height);
+        init.extend(std::iter::repeat('.').take(need));
+
         // starting state, every 2nd and 7th cell is alive
-        let cells = (0..width * height)
-            .map(|i| {
-                if i % 2 == 0 || i % 7 == 0 {
-                    Cell::Alive
-                } else {
-                    Cell::Dead
-                }
+        let cells = init
+            .iter()
+            .map(|c| match c {
+                '.' => Cell::Alive,
+                _ => Cell::Dead,
             })
             .collect();
 

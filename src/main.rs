@@ -5,11 +5,23 @@ use macroquad::{miniquad::conf::Platform, prelude::*};
 use once_cell::sync::Lazy;
 use std::sync::RwLock;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone)]
 struct Settings {
     paused: bool,
     click_mode: Cell,
     step: bool,
+    clear: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            paused: true,
+            click_mode: Cell::Alive,
+            step: false,
+            clear: false,
+        }
+    }
 }
 
 // shared by main loop and javascript iterop for user input.
@@ -34,6 +46,12 @@ pub extern "C" fn toggle_click_mode() {
 pub extern "C" fn step() {
     let mut settings = SETTINGS.write().unwrap();
     settings.step = true;
+}
+
+#[no_mangle]
+pub extern "C" fn clear() {
+    let mut settings = SETTINGS.write().unwrap();
+    settings.clear = true;
 }
 
 #[macroquad::main(window_conf)]
@@ -68,22 +86,38 @@ async fn main() {
             world.cells[cell_index] = click_mode;
         }
 
-        let (paused, step) = {
-            let settings = SETTINGS.read().unwrap();
-            (settings.paused, settings.step)
-        };
+        let settings = { SETTINGS.read().unwrap().clone() };
 
-        if !paused || step {
+        if !settings.paused || settings.step {
             world.tick();
             frame += 1;
         }
 
-        if step {
+        if settings.step {
             // step is implemented via a bool in settings,
             // if it is set we will advance the frame in the block
-            //  above and immediately set it to false here
+            // above and immediately set it to false here
             let mut settings = SETTINGS.write().unwrap();
             settings.step = false;
+        }
+
+        if settings.clear {
+            let mut settings = SETTINGS.write().unwrap();
+
+            let mut statestr = String::new();
+            for c in world.cells.iter_mut() {
+                let var_name = match c {
+                    Cell::Alive => '.',
+                    Cell::Dead => '_',
+                };
+                let s = var_name;
+                statestr.push(s);
+                *c = Cell::Dead;
+            }
+            info!("{}", statestr);
+
+            settings.clear = false;
+            settings.paused = true;
         }
 
         next_frame().await
